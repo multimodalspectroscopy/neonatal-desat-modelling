@@ -1,0 +1,85 @@
+# Sensitivity Analysis for bp_hypothermia model
+
+# Use scratch/SA_clean.csv as data file
+
+# in the absence of explicit other settings (TBD), various details are concocted from the model name
+# including program & workdir
+model: bp_hypothermia_2
+
+# all distribs default to (constant, 0) if not given
+
+# vars to be simulated, with distrib of initial conditions
+
+var: HbO2, uniform, -0.1, 0.1
+# var: HbT, uniform, -0.1, 0.1
+var: HHb, uniform, -0.1, 0.1
+var: CCO, uniform, -0.1, 0.1
+# var: Hbdiff, uniform, -0.1, 0.1 
+
+# optional external file specifying param distributions
+# (explicit param lines can override this on an individual basis)
+param_file: param_files/bp_hypothermia_params.csv
+
+
+# job mode specifies how multiple varying parameters are combined
+# should be one of: single, pairwise, cartesian or (TODO) morris
+# default is single
+# (cartesian should only be used with small numbers of params!)
+job_mode: morris
+
+# param_select specifies which params to vary
+# may specify an explicit (comma-separated) list
+# or * to mean all params for which a distrib has been provided (the default)
+param_select: *
+
+
+# param: insult_nadir, uniform, 0,0.00001
+# param: death_transition, uniform, 0, 0.00001
+
+# inputs, with perturbation distribs
+# (latter ignored unless the --perturb command-line switch is given)
+input: SaO2sup, uniform, 0.99, 1
+input: P_a, uniform, 47, 48
+input: temp, uniform, 37, 39
+
+# use an alias for t to specify the t variable, if not using the default ' t'
+# in particular, you might need to alias t to itself
+# if explicitly including it by that name in a CSV
+alias: t, t
+# alias: DHbdiff, Hbdiff
+# alias: DHbT, HbT
+# alias: DHbO2, HbO2
+# alias: DHHb, HHB
+# alias: CCO, CCO
+
+# Post process NIRS signals- zero them to make Delta value.
+
+post: CCO, zero
+# post: HbT, zero
+# post: Hbdiff, zero
+post: HHb, zero
+post: HbO2, zero
+
+# Set distance measure
+distance: nrmse
+
+# the number of distinct levels (potentially) tested per parameter
+divisions: 20
+
+# periodically save intermediate results after this many jobs (default 100)
+# set to 0 for no intermediate saves
+# save_interval: 0
+
+# the number of paths to run (only relevant for Morris sampling)
+npath: 40
+
+# where to start each trajectory:
+# random = a completely random point in the search sequence
+# default = start at default value for params (or nearest point on search grid)
+path_start: random
+
+# number of sims to run in parallel
+nbatch: 8
+
+# NaN substitute value
+substitute: 10000000
