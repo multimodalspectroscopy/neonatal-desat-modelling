@@ -97,10 +97,8 @@ VArat_n,uniform,2.4,3.6,3
 Vol_mit,uniform,0.0536,0.0804,0.067
 Vol_totn,uniform,0.8,1.2,1
 Xtot_n,uniform,3.5,8,5.4
-Q_10,uniform,1,6,2.4
 temp_n,uniform,30,40,37
 cell_death,uniform,0,1,0
-Q_10_met,uniform,1,6,2.4
-Q_10_haemo,uniform,1,6,2.4
-q_diff,uniform,0,5,1
+Q_10_met,uniform,0.1,6,2.4
+Q_10_haemo,uniform,0.1,6,2.4
 
