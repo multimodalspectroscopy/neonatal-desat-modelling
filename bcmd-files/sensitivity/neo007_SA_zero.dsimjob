@@ -10,11 +10,9 @@ model: bp_hypothermia_2
 
 # vars to be simulated, with distrib of initial conditions
 
-var: HbO2, uniform, -0.1, 0.1
 # var: HbT, uniform, -0.1, 0.1
-var: HHb, uniform, -0.1, 0.1
 var: CCO, uniform, -0.1, 0.1
-# var: Hbdiff, uniform, -0.1, 0.1 
+var: Hbdiff, uniform, -0.1, 0.1 
 
 # optional external file specifying param distributions
 # (explicit param lines can override this on an individual basis)
@@ -38,9 +36,10 @@ param_select: *
 
 # inputs, with perturbation distribs
 # (latter ignored unless the --perturb command-line switch is given)
-input: SaO2sup, uniform, 0.99, 1
-input: P_a, uniform, 47, 48
-input: temp, uniform, 37, 39
+input: SaO2sup, uniform, 0.96, 0.99
+input: P_a, uniform, 39, 48
+input: PaCO2, uniform, 4.5, 5.5
+input: temp, uniform, 33.5, 33.5
 
 # use an alias for t to specify the t variable, if not using the default ' t'
 # in particular, you might need to alias t to itself
@@ -56,12 +55,20 @@ alias: t, t
 
 post: CCO, zero
 # post: HbT, zero
-# post: Hbdiff, zero
-post: HHb, zero
-post: HbO2, zero
+post: Hbdiff, zero
+# post: HHb, zero
+# post: HbO2, zero
 
 # Set distance measure
-distance: nrmse
+# distance: nrmse
+distance: cropped_pearsonr_distance
+x_variable: CCO
+cropStart: 530
+cropStop: 819
+
+x_variable: CCO
+
+
 
 # the number of distinct levels (potentially) tested per parameter
 divisions: 20
@@ -82,4 +89,4 @@ path_start: random
 nbatch: 8
 
 # NaN substitute value
-substitute: 10000000
+substitute: 0
