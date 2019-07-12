@@ -1,14 +1,14 @@
 #!/bin/bash
 
-DATASET="neo007"
-OUTDIR1=`readlink -m "../../data/SA_results/bph_2/with_cellDeath/nrmse/${DATASET}"`
-OUTDIR2=`readlink -m "../../data/SA_results/bph_2/with_cellDeath/nrmse_zero/${DATASET}"`
+DATASET="neo021"
+OUTDIR1=`readlink -m "../../data/SA_results/${DATASET}"`
+OUTDIR2=`readlink -m "../../data/SA_results/${DATASET}_zero"`
 
 WORKDIR=$1
 JOBFILE1="${WORKDIR}${DATASET}_SA.dsimjob"
 JOBFILE2="${WORKDIR}${DATASET}_SA_zero.dsimjob"
 
-DATAFILE="../../data/formatted_desat/${DATASET}_filtered_formatted.csv"
+DATAFILE="../../data/formatted_data/${DATASET}_formatted.csv"
 
 echo "Writing to ${OUTDIR1}"
 mkdir -p ${OUTDIR1}
