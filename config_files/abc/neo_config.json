@@ -1,0 +1,94 @@
+{
+    "model_name": "bp_hypothermia_2",
+    "inputs": [
+        "SaO2sup",
+        "P_a",
+        "temp",
+        "PaCO2"
+    ],
+    "create_params": false,
+    "priors": {
+        "phi": [
+            "uniform",
+            [
+                0.0288,
+                0.0432
+            ]
+        ],
+        "r_n": [
+            "uniform",
+            [
+                0.01496,
+                0.02244
+            ]
+        ],
+        "r_0": [
+            "uniform",
+            [
+                0.01008,
+                0.015119999999999998
+            ]
+        ],
+        "k_aut": [
+            "uniform",
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "Q_10_haemo": [
+            "uniform",
+            [
+                0.1,
+                6.0
+            ]
+        ],
+        "n_m": [
+            "uniform",
+            [
+                1.464,
+                2.1959999999999997
+            ]
+        ],
+        "r_m": [
+            "uniform",
+            [
+                0.0216,
+                0.0324
+            ]
+        ],
+        "CBFn": [
+            "uniform",
+            [
+                0.0064,
+                0.0096
+            ]
+        ],
+        "Q_10_met": [
+            "uniform",
+            [
+                0.1,
+                6.0
+            ]
+        ],
+        "CMRO2_n": [
+            "uniform",
+            [
+                0.016,
+                0.024
+            ]
+        ]
+    },
+    "targets": [
+        "CCO",
+        "HbT",
+        "Hbdiff"
+    ],
+    "zero_flag": {
+        "CCO": true,
+        "HbT": true,
+        "Hbdiff": true
+    },
+    "batch_debug": false,
+    "store_simulations": false
+}
