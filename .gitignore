@@ -106,3 +106,7 @@ venv.bak/
 
 #
 *hypothermia-auth.json
+
+data/debug_results/
+
+data/SA_results/
