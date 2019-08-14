@@ -110,3 +110,5 @@ venv.bak/
 data/debug_results/
 
 data/SA_results/
+
+\.vscode/
