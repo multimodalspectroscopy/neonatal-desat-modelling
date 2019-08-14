@@ -1,12 +1,12 @@
 #!/bin/bash -l
 #$ -l h_rt=1:00:00
 #$ -N neo021
-#$ -o /home/ucbpjru/Scratch/neo021/out
-#$ -e /home/ucbpjru/Scratch/neo021/err
+#$ -o /home/ucbpjru/Scratch/neo021/out/
+#$ -e /home/ucbpjru/Scratch/neo021/err/
 #$ -wd /home/ucbpjru/Scratch
 # Set up the job array.  In this instance we have requested 1000 tasks
 # numbered 1 to 1000.
-#$ -t 1-20000
+#$ -t 20001-40000
 
 module load python3/recommended
 cd $TMPDIR
