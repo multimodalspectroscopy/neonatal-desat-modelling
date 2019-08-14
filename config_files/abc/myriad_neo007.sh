@@ -6,7 +6,7 @@
 #$ -wd /home/ucbpjru/Scratch
 # Set up the job array.  In this instance we have requested 1000 tasks
 # numbered 1 to 1000.
-#$ -t 1
+#$ -t 20001-40000
 
 module load python3/recommended
 cd $TMPDIR
