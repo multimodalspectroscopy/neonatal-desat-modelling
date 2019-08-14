@@ -2,8 +2,8 @@ from google.cloud import bigquery
 import itertools
 
 
-DATASETS = ['LWP475', 'LWP479', 'LWP481', 'LWP484']
-MODELS = ['bph0']
+NEONATES = ['neo007', 'neo021']
+
 LOCATION = 'EU'
 
 
@@ -28,20 +28,21 @@ def dataset_exists(client, dataset_reference):
         return False
 
 
-combinations = list(itertools.product(DATASETS, MODELS))
+for neonate in NEONATES:
 
-for combo in combinations:
-
-    print("Working on {0} - {1}".format(*combo))
+    print("Working on {}".format(neonate))
     # Construct a BigQuery client object.
-    client = bigquery.Client()
+    client = bigquery.Client.from_service_account_json(
+    "./hypothermia-auth.json"
+)
 
     # Set dataset_id to the ID of the dataset to create.
-    dataset_id = combo[0]
-    table_id = combo[1]
 
-    filename = '/home/buck06191/Dropbox/phd/hypothermia/ABC/nrmse_SA/{}/{}/all_parameters.csv'.format(
-        table_id, dataset_id)
+    dataset_id = 'neo_desat'
+    table_id = neonate
+
+    filename = '/home/buck06191/Dropbox/phd/desat_neonate/ABC/pearsonr_SA/{}/all_parameters.csv'.format(
+        table_id)
 
     if not dataset_exists(client, dataset_id):
         # Construct a full Dataset object to send to the API.
