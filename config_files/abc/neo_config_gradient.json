@@ -1,0 +1,115 @@
+{
+    "model_name": "bp_hypothermia_2",
+    "inputs": [
+        "SaO2sup",
+        "P_a",
+        "temp",
+        "PaCO2"
+    ],
+    "create_params": false,
+    "priors": {
+        "k_aut": [
+            "uniform",
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "r_0": [
+            "uniform",
+            [
+                0.01008,
+                0.015119999999999998
+            ]
+        ],
+        "r_m": [
+            "uniform",
+            [
+                0.0216,
+                0.0324
+            ]
+        ],
+        "r_n": [
+            "uniform",
+            [
+                0.01496,
+                0.02244
+            ]
+        ],
+        "n_m": [
+            "uniform",
+            [
+                1.464,
+                2.1959999999999997
+            ]
+        ],
+        "n_h": [
+            "uniform",
+            [
+                2.0,
+                3.0
+            ]
+        ],
+        "phi": [
+            "uniform",
+            [
+                0.0288,
+                0.0432
+            ]
+        ],
+        "_Py0n": [
+            "uniform",
+            [
+                0.08,
+                0.12
+            ]
+        ],
+        "CMRO2_n": [
+            "uniform",
+            [
+                0.016,
+                0.024
+            ]
+        ],
+        "Q_10_haemo": [
+            "uniform",
+            [
+                0.1,
+                6.0
+            ]
+        ],
+        "Q_10_met": [
+            "uniform",
+            [
+                0.1,
+                6.0
+            ]
+        ],
+        "h_0": [
+            "uniform",
+            [
+                0.0024,
+                0.0036
+            ]
+        ],
+        "CBFn": [
+            "uniform",
+            [
+                0.0064,
+                0.0096
+            ]
+        ]
+    },
+    "targets": [
+        "CCO",
+        "HbT",
+        "Hbdiff"
+    ],
+    "zero_flag": {
+        "CCO": true,
+        "HbT": true,
+        "Hbdiff": true
+    },
+    "batch_debug": false,
+    "store_simulations": false
+}
