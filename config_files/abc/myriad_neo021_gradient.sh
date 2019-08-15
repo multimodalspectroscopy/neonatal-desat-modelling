@@ -1,8 +1,8 @@
 #!/bin/bash -l
 #$ -l h_rt=1:00:00
 #$ -N gradient_neo021
-#$ -o /home/ucbpjru/Scratch/neo021/out
-#$ -e /home/ucbpjru/Scratch/neo021/err
+#$ -o /home/ucbpjru/Scratch/neo021_gradient/out
+#$ -e /home/ucbpjru/Scratch/neo021_gradient/err
 #$ -wd /home/ucbpjru/Scratch
 # Set up the job array.  In this instance we have requested 1000 tasks
 # numbered 1 to 1000.
@@ -22,4 +22,4 @@ start=`date +%s`
 python3 $BASEDIR/scripts/batch.py 1000 $DATAFILE $CONFIGFILE --workdir $TMPDIR
 echo "Duration: $(($(date +%s)-$start))" > $TMPDIR/$SGE_TASK_ID.timings.txt
 
-tar -zcvf $HOME/Scratch/${DATASET}/batch_$JOB_NAME.$SGE_TASK_ID.tar.gz $TMPDIR
+tar -zcvf $HOME/Scratch/${DATASET}_gradient/batch_$JOB_NAME.$SGE_TASK_ID.tar.gz $TMPDIR
