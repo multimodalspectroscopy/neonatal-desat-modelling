@@ -91,7 +91,7 @@ def generate_histogram_query(project, neonate, n_bins, distance):
         MAX({distance}) AS max,
         MIN({distance}) AS min
       FROM
-        [{project}:neo_desat.{neonate}]) value
+        [{project}:neo_desat.{neonate}_gradient]) value
     GROUP BY
       group_
     ORDER BY
@@ -101,6 +101,21 @@ def generate_histogram_query(project, neonate, n_bins, distance):
 
 
 # In[4]:
+def generate_posterior_query(project, neonate, distance, parameters, limit=50000):
+    unpacked_params = ",\n".join(parameters)
+    histogram_query = """
+    SELECT
+        {unpacked_params},
+        {distance},
+        idx
+    FROM
+    `{project}.neo_desat.{neonate}_gradient`
+    ORDER BY
+    {distance} ASC
+    LIMIT
+    {limit}
+    """.format(project=project, neonate=neonate, unpacked_params=unpacked_params, distance=distance, limit=limit)
+    return histogram_query
 
 
 def generate_posterior_query(project, neonate, distance, parameters, limit=50000):
@@ -111,7 +126,7 @@ SELECT
     {distance},
     idx
 FROM
-  `{project}.neo_desat.{neonate}`
+  `{project}.neo_desat.{neonate}_gradient`
 ORDER BY
   {distance} ASC
 LIMIT
@@ -408,147 +423,160 @@ configuration = {}
 
 neonates = ['neo007', 'neo021']
 
+signals = ['CCO', 'HbT', 'Hbdiff']
 
-for NEONATE in neonates:
-    print("Working on {} ".format(NEONATE))
-    # Set config and create figure path
+for SIGNAL in [''] + signals:
+    print("Working on {} ".format(SIGNAL if SIGNAL != '' else "TOTAL"))
+    posterior_size = 4000
+    if SIGNAL != '':
+        distance = SIGNAL + "_NRMSE"
+    else:
+        distance = "NRMSE"
+    for NEONATE in neonates:
 
-    configuration[NEONATE] = {}
+        print("Working on {} ".format(NEONATE))
+        # Set config and create figure path
 
-    config, d0 = load_configuration(NEONATE)
-    configuration[NEONATE]['bayescmd_config'] = config
-    configuration[NEONATE]['original_data'] = d0
+        configuration[NEONATE] = {}
 
-    configuration[NEONATE]['histogram_query'] = generate_histogram_query('hypothermia-bayescmd',
-                                                                         NEONATE,
-                                                                         100,
-                                                                         'NRMSE')
+        config, d0 = load_configuration(NEONATE)
+        configuration[NEONATE]['bayescmd_config'] = config
+        configuration[NEONATE]['original_data'] = d0
 
-    configuration[NEONATE]['posterior_query'] = generate_posterior_query('hypothermia-bayescmd',
-                                                                         NEONATE,
-                                                                         'NRMSE',
-                                                                         list(configuration[NEONATE]['bayescmd_config']['parameters'].keys()))
+        configuration[NEONATE]['histogram_query'] = generate_histogram_query('hypothermia-bayescmd',
+                                                                             NEONATE,
+                                                                             100,
+                                                                             distance)
 
-    figPath = "/home/buck06191/Dropbox/phd/desat_neonate/ABC/Figures/{}/{}".format(
-        NEONATE, 'NRMSE')
-    dir_util.mkpath(figPath)
+        configuration[NEONATE]['posterior_query'] = generate_posterior_query('hypothermia-bayescmd',
+                                                                             NEONATE,
+                                                                             distance,
+                                                                             list(
+                                                                                 configuration[NEONATE]['bayescmd_config']['parameters'].keys()),
+                                                                             limit=posterior_size)
 
-    # Get posterior
-    print("\tRunning SQL query")
-    df_post = client.query(
-        configuration[NEONATE]['posterior_query']).to_dataframe()
-    N = LIM
-    # Plot posterior predictive
-    config["offset"] = {}
-    print("\tGetting Posterior Predictive")
+        figPath = "/home/buck06191/Dropbox/phd/desat_neonate/ABC/Figures/Combined_gradient/{}/{}".format(
+            NEONATE, 'NRMSE')
+        dir_util.mkpath(figPath)
 
-    with Timer("Getting outputs"):
-        outputs_list = get_runs(df_post, config, n_repeats=N)
-        results = {}
-        print("\n")
+        # Get posterior
+        print("\tRunning SQL query")
+        df_post = client.query(
+            configuration[NEONATE]['posterior_query']).to_dataframe()
+        N = int(posterior_size)
+        # Plot posterior predictive
+        config["offset"] = {}
+        print("\tGetting Posterior Predictive")
 
-    for i, output in enumerate(outputs_list):
-        results[i] = {}
-        summary_creator = SummaryStats(
-            output, config['targets'], config['zero_flag'], observed_data=d0)
-        summary_creator.get_stats()
-        results[i]['data'] = summary_creator.d0
-        results[i]['residuals'] = summary_creator.residuals
-        results[i]['stats'] = summary_creator.summary_stats
+        with Timer("Getting outputs"):
+            outputs_list = get_runs(
+                df_post, config, n_repeats=N)
+            results = {}
+            print("\n")
 
-    resid_formatted = [{'Batch': i, 'Signal': j, 'Residuals': v, 'Time (sec)': idx+1} for i in results.keys(
-    ) for j in results[i]['residuals'].keys() for idx, v in enumerate(results[i]['residuals'][j])]
-    data_formatted = [{'Batch': i, 'Signal': j, 'Data': v, 'Time (sec)': idx+1} for i in results.keys(
-    ) for j in results[i]['data'].keys() for idx, v in enumerate(results[i]['data'][j])]
+        for i, output in enumerate(outputs_list):
+            results[i] = {}
+            summary_creator = SummaryStats(
+                output, config['targets'], config['zero_flag'], observed_data=d0)
+            summary_creator.get_stats()
+            results[i]['data'] = summary_creator.d0
+            results[i]['residuals'] = summary_creator.residuals
+            results[i]['stats'] = summary_creator.summary_stats
 
-    print("Residuals Dataframe")
-    residuals = reduce_dataframe(pd.DataFrame(resid_formatted))
-    del resid_formatted
-    print("Data Dataframe")
-    data = reduce_dataframe(pd.DataFrame(data_formatted))
+        resid_formatted = [{'Batch': i, 'Signal': j, 'Residuals': v, 'Time (sec)': idx+1} for i in results.keys(
+        ) for j in results[i]['residuals'].keys() for idx, v in enumerate(results[i]['residuals'][j])]
+        data_formatted = [{'Batch': i, 'Signal': j, 'Data': v, 'Time (sec)': idx+1} for i in results.keys(
+        ) for j in results[i]['data'].keys() for idx, v in enumerate(results[i]['data'][j])]
 
-    del data_formatted
-    fig1, axes1 = plt.subplots(2, 2, figsize=(7, 7))
-    fig2, axes2 = plt.subplots(2, 2, figsize=(7, 7))
+        print("Residuals Dataframe")
+        residuals = reduce_dataframe(pd.DataFrame(resid_formatted))
+        del resid_formatted
+        print("Data Dataframe")
+        data = reduce_dataframe(pd.DataFrame(data_formatted))
 
-    for ii, s in enumerate(config['targets']):
-        signal_resid = residuals[residuals['Signal'] == s]['Residuals']
-        ax1 = axes1.flatten()[ii]
-        sns.distplot(signal_resid, ax=ax1)
-        resid_mu, resid_sigma = np.mean(signal_resid), np.std(signal_resid)
-        print("\t{}: Mean $(\mu$): {:.3g}\n\tStandard Deviation ($\sigma$): {:.3g}".format(
-            s.upper(), resid_mu, resid_sigma))
-        mean = ax1.axvline(resid_mu, color='k', label='Mean', linestyle='--')
-        std = ax1.axvline(resid_mu-resid_sigma, color='g',
-                          label='Standard Deviation', linestyle='--')
-        ax1.axvline(resid_mu+resid_sigma, color='g', linestyle='--')
-        ax1.set_title("{}".format(s), fontsize=12)
+        del data_formatted
+        fig1, axes1 = plt.subplots(2, 2, figsize=(7, 7))
+        fig2, axes2 = plt.subplots(2, 2, figsize=(7, 7))
 
-        ax2 = axes2.flatten()[ii]
-        resid = signal_resid.values.copy()
-        sm.qqplot(resid, line='s', ax=ax2)
-        ax2.axhline(0, color='k', linestyle='--')
-        sample_mean = ax2.axhline(
-            resid_mu, color='xkcd:orange', linestyle=':', label="Sample Mean")
-        theoretical_mean = ax2.axvline(
-            0, color='k', linestyle='--', label="Theoretical Mean")
-        ax2.set_title("{}".format(s), fontsize=12)
-        # print(stats.anderson(resid, dist='norm'))
+        for ii, s in enumerate(config['targets']):
+            signal_resid = residuals[residuals['Signal'] == s]['Residuals']
+            ax1 = axes1.flatten()[ii]
+            sns.distplot(signal_resid, ax=ax1)
+            resid_mu, resid_sigma = np.mean(signal_resid), np.std(signal_resid)
+            print("\t{}: Mean $(\mu$): {:.3g}\n\tStandard Deviation ($\sigma$): {:.3g}".format(
+                s.upper(), resid_mu, resid_sigma))
+            mean = ax1.axvline(resid_mu, color='k',
+                               label='Mean', linestyle='--')
+            std = ax1.axvline(resid_mu-resid_sigma, color='g',
+                              label='Standard Deviation', linestyle='--')
+            ax1.axvline(resid_mu+resid_sigma, color='g', linestyle='--')
+            ax1.set_title("{}".format(s), fontsize=12)
 
-    axes1[-1, -1].axis('off')
-    axes2[-1, -1].axis('off')
+            ax2 = axes2.flatten()[ii]
+            resid = signal_resid.values.copy()
+            sm.qqplot(resid, line='s', ax=ax2)
+            ax2.axhline(0, color='k', linestyle='--')
+            sample_mean = ax2.axhline(
+                resid_mu, color='xkcd:orange', linestyle=':', label="Sample Mean")
+            theoretical_mean = ax2.axvline(
+                0, color='k', linestyle='--', label="Theoretical Mean")
+            ax2.set_title("{}".format(s), fontsize=12)
+            # print(stats.anderson(resid, dist='norm'))
 
-    lgd1 = fig1.legend(handles=[mean, std], bbox_to_anchor=(
-        0.55, 0.4), loc=2, fontsize=14)
-    fig1.tight_layout()
-    fig1.subplots_adjust(top=0.85)
-    TIFF_exporter(fig1, 'residuals_dist_{}'.format(NEONATE),
-                  fig_dir=figPath, extra_artists=(lgd1,))
+        axes1[-1, -1].axis('off')
+        axes2[-1, -1].axis('off')
 
-    lgd2 = fig2.legend(handles=[theoretical_mean, sample_mean], bbox_to_anchor=(
-        0.55, 0.4), loc=2, fontsize=14)
-    fig2.tight_layout()
-    fig2.subplots_adjust(top=0.85)
-    TIFF_exporter(fig2, 'residuals_qq_{}'.format(NEONATE),
-                  fig_dir=figPath, extra_artists=(lgd2,))
+        lgd1 = fig1.legend(handles=[mean, std], bbox_to_anchor=(
+            0.55, 0.4), loc=2, fontsize=14)
+        fig1.tight_layout()
+        fig1.subplots_adjust(top=0.85)
+        TIFF_exporter(fig1, 'residuals_dist_{}'.format(NEONATE),
+                      fig_dir=figPath, extra_artists=(lgd1,))
 
-    posterior = {}
-    prior = {}
-    entropy = {}
-    bins = {}
-    fig4, axes4 = plt.subplots(
-        ceil(len(config['parameters'])/3), 3, figsize=(7, 8))
-    i = 0
-    for k, v in config['parameters'].items():
-        ax = axes4[i//3][i % 3]
+        lgd2 = fig2.legend(handles=[theoretical_mean, sample_mean], bbox_to_anchor=(
+            0.55, 0.4), loc=2, fontsize=14)
+        fig2.tight_layout()
+        fig2.subplots_adjust(top=0.85)
+        TIFF_exporter(fig2, 'residuals_qq_{}'.format(NEONATE),
+                      fig_dir=figPath, extra_artists=(lgd2,))
 
-        prior[k], bins[k] = np.histogram(np.random.uniform(
-            v[1][0], v[1][1], LIM), 50, density=True)
-        posterior[k], _ = np.histogram(
-            df_post[k].values, bins=bins[k], density=True)
+        posterior = {}
+        prior = {}
+        entropy = {}
+        bins = {}
+        fig4, axes4 = plt.subplots(
+            ceil(len(config['parameters'])/3), 3, figsize=(7, 8))
+        i = 0
+        for k, v in config['parameters'].items():
+            ax = axes4[i//3][i % 3]
 
-        entropy[k] = stats.entropy(posterior[k], prior[k])
-        line_post = ax.bar(bins[k][:-1], posterior[k], width=bins[k]
-                           [1]-bins[k][0], align='edge', label='Posterior')
-        line_prior = ax.bar(bins[k][:-1], prior[k], width=bins[k]
-                            [1]-bins[k][0], align='edge', alpha=.75, label='Prior')
-        # ax.text(0.7,0.965, "Entropy: {:.3g}".format(entropy[k]), transform=ax.transAxes, size=16)
-        ax.set_title(
-            "K-L Divergence: {:.3g}".format(entropy[k]), y=1.01, fontsize=12)
-        ax.set_xlabel(k)
-        plt.setp(ax.xaxis.get_majorticklabels(), rotation=40)
+            prior[k], bins[k] = np.histogram(np.random.uniform(
+                v[1][0], v[1][1], LIM), 50, density=True)
+            posterior[k], _ = np.histogram(
+                df_post[k].values, bins=bins[k], density=True)
 
-        fig4.tight_layout()
-        i += 1
+            entropy[k] = stats.entropy(posterior[k], prior[k])
+            line_post = ax.bar(bins[k][:-1], posterior[k], width=bins[k]
+                               [1]-bins[k][0], align='edge', label='Posterior')
+            line_prior = ax.bar(bins[k][:-1], prior[k], width=bins[k]
+                                [1]-bins[k][0], align='edge', alpha=.75, label='Prior')
+            # ax.text(0.7,0.965, "Entropy: {:.3g}".format(entropy[k]), transform=ax.transAxes, size=16)
+            ax.set_title(
+                "K-L Divergence: {:.3g}".format(entropy[k]), y=1.01, fontsize=12)
+            ax.set_xlabel(k)
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=40)
 
-    n_emptyAxes = 3-len(config['parameters']) % 3
-    if n_emptyAxes > 0:
-        for n in range(1, n_emptyAxes+1):
-            axes4[-1, int(-1*n)].axis('off')
+            fig4.tight_layout()
+            i += 1
 
-    lgd4 = fig4.legend(handles=[line_post, line_prior],
-                       bbox_to_anchor=(0.7, 0.2), loc=2, fontsize=12)
+        n_emptyAxes = 3-len(config['parameters']) % 3
+        if n_emptyAxes > 0:
+            for n in range(1, n_emptyAxes+1):
+                axes4[-1, int(-1*n)].axis('off')
 
-    TIFF_exporter(fig4, 'kl_div_{}'.format(NEONATE),
-                  fig_dir=figPath, extra_artists=(lgd4,))
-    plt.close('all')
+        lgd4 = fig4.legend(handles=[line_post, line_prior],
+                           bbox_to_anchor=(0.7, 0.2), loc=2, fontsize=12)
+
+        TIFF_exporter(fig4, 'kl_div_{}'.format(NEONATE),
+                      fig_dir=figPath, extra_artists=(lgd4,))
+        plt.close('all')

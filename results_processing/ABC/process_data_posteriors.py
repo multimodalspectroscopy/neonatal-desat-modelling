@@ -62,45 +62,6 @@ client = bigquery.Client.from_service_account_json(
 get_ipython().run_line_magic('load_ext', 'google.cloud.bigquery')
 
 
-posterior_size = 10000
-
-neo007_query = """
-SELECT
-phi,r_n,r_0,k_aut,Q_10_haemo,n_m,r_m,CBFn,Q_10_met,CMRO2_n,
-  NRMSE,
-  "neo007" as Neonate
-FROM
-  neo_desat.neo007
-ORDER BY
-  NRMSE ASC
-LIMIT
-  {}
-""".format(posterior_size)
-
-
-# In[ ]:
-
-
-neo021_query = """
-SELECT
-phi,r_n,r_0,k_aut,Q_10_haemo,n_m,r_m,CBFn,Q_10_met,CMRO2_n,
-  NRMSE,
-  "neo021" as Neonate
- FROM
-  neo_desat.neo021
- ORDER BY NRMSE ASC
- LIMIT {}
- """.format(posterior_size)
-
-
-with Timer("Pulling Posterior from Big Query"):
-    neo007 = client.query(neo007_query).to_dataframe()
-
-    neo021 = client.query(neo021_query).to_dataframe()
-
-    df = pd.concat([neo007, neo021])
-
-
 priors = {
     "phi": [
         "uniform",
@@ -229,60 +190,106 @@ def medians_comparison_kde_plot(x, y, medians, **kws):
     return ax
 
 
-parameters = list(priors.keys())
-medians = {}
-with sns.plotting_context("paper", rc={"xtick.labelsize": 12,
-                                       "ytick.labelsize": 12,
-                                       "axes.labelsize": 8}):
-    g = sns.PairGrid(df,
-                     vars=parameters,
-                     diag_sharey=False,
-                     height=0.5,
-                     hue='Neonate')
+signals = ['CCO', 'HbT', 'Hbdiff']
 
-    with Timer("Plotting diagonals"):
+for SIGNAL in [''] + signals:
+    print("Working on {} ".format(SIGNAL if SIGNAL != '' else "TOTAL"))
+    posterior_size = 4000
+    if SIGNAL != '':
+        distance = SIGNAL + "_NRMSE"
+    else:
+        distance = "NRMSE"
 
-        g.map_diag(sns.distplot, hist_kws=dict(alpha=0.5))
-        plot_comparison_diag_medians(g, df, medians=medians)
-    with Timer("Plotting lower triangle"):
-        g.map_lower(medians_comparison_kde_plot, medians=medians)
-    n_ticks = 4
-    with Timer("Formatting figure"):
-        for i, j in zip(*np.triu_indices_from(g.axes, 1)):
-            g.axes[i, j].set_visible(False)
-        for ii, ax in enumerate(g.axes.flat):
-            for label in ax.get_xticklabels():
-                label.set_rotation(75)
-            ax.xaxis.labelpad = 5
-            ax.yaxis.labelpad = 5
-            ii_y = ii // len(parameters)
-            ii_x = ii % len(parameters)
-            ax.set_ylim(priors[parameters[ii_y]][1])
-            ax.set_xlim(priors[parameters[ii_x]][1])
-            xmax = priors[parameters[ii_x]][1][1]
-            xmin = priors[parameters[ii_x]][1][0]
-            xticks = np.arange(xmin, xmax,
-                               round_sig((xmax - xmin) / n_ticks, sig=1))
-            ax.set_xticks(xticks)
-            ax.set_xlabel(ax.get_xlabel(), labelpad=1, rotation=30, fontsize=8)
-            ax.set_ylabel(ax.get_ylabel(), labelpad=15,
-                          rotation=45, fontsize=8)
-        lines = []
-        # lines.append(('True Value', mlines.Line2D([], [], color='black')))
-        lines.append(('Posterior Median - neo007',
-                      mlines.Line2D([], [], color=sns.color_palette()[0])))
-        lines.append(('Posterior Median - neo021',
-                      mlines.Line2D([], [], color=sns.color_palette()[1])))
-        g.set(yticklabels=[])
-        g.set(xticklabels=[])
-        g.fig.legend(labels=[l[0] for l in lines],
-                     handles=[l[1] for l in lines],
-                     bbox_to_anchor=(0.995, 0.995), loc=1, prop={"size": 11})
+    neo007_query = """
+    SELECT
+    phi,r_n,r_0,k_aut,Q_10_haemo,n_m,r_m,CBFn,Q_10_met,CMRO2_n,
+    NRMSE,
+    "neo007" as Neonate
+    FROM
+    neo_desat.neo007_gradient
+    ORDER BY
+    {} ASC
+    LIMIT
+    {}
+    """.format(distance, posterior_size)
 
-        # g.fig.tight_layout()
-        g.fig.subplots_adjust(wspace=0.15, hspace=0.25)
+    # In[ ]:
+
+    neo021_query = """
+    SELECT
+    phi,r_n,r_0,k_aut,Q_10_haemo,n_m,r_m,CBFn,Q_10_met,CMRO2_n,
+    NRMSE,
+    "neo021" as Neonate
+    FROM
+    neo_desat.neo021_gradient
+    ORDER BY {} ASC
+    LIMIT {}
+    """.format(distance, posterior_size)
+
+    with Timer("Pulling Posterior from Big Query"):
+        neo007 = client.query(neo007_query).to_dataframe()
+
+        neo021 = client.query(neo021_query).to_dataframe()
+
+        df = pd.concat([neo007, neo021])
+
+    parameters = list(priors.keys())
+    medians = {}
+    with sns.plotting_context("paper", rc={"xtick.labelsize": 12,
+                                           "ytick.labelsize": 12,
+                                           "axes.labelsize": 8}):
+        g = sns.PairGrid(df,
+                         vars=parameters,
+                         diag_sharey=False,
+                         height=0.5,
+                         hue='Neonate')
+
+        with Timer("Plotting diagonals"):
+
+            g.map_diag(sns.distplot, hist_kws=dict(alpha=0.5))
+            plot_comparison_diag_medians(g, df, medians=medians)
+        with Timer("Plotting lower triangle"):
+            g.map_lower(medians_comparison_kde_plot, medians=medians)
+        n_ticks = 4
+        with Timer("Formatting figure"):
+            for i, j in zip(*np.triu_indices_from(g.axes, 1)):
+                g.axes[i, j].set_visible(False)
+            for ii, ax in enumerate(g.axes.flat):
+                for label in ax.get_xticklabels():
+                    label.set_rotation(75)
+                ax.xaxis.labelpad = 5
+                ax.yaxis.labelpad = 5
+                ii_y = ii // len(parameters)
+                ii_x = ii % len(parameters)
+                ax.set_ylim(priors[parameters[ii_y]][1])
+                ax.set_xlim(priors[parameters[ii_x]][1])
+                xmax = priors[parameters[ii_x]][1][1]
+                xmin = priors[parameters[ii_x]][1][0]
+                xticks = np.arange(xmin, xmax,
+                                   round_sig((xmax - xmin) / n_ticks, sig=1))
+                ax.set_xticks(xticks)
+                ax.set_xlabel(ax.get_xlabel(), labelpad=1,
+                              rotation=30, fontsize=8)
+                ax.set_ylabel(ax.get_ylabel(), labelpad=15,
+                              rotation=45, fontsize=8)
+            lines = []
+            # lines.append(('True Value', mlines.Line2D([], [], color='black')))
+            lines.append(('Posterior Median - neo007',
+                          mlines.Line2D([], [], color=sns.color_palette()[0])))
+            lines.append(('Posterior Median - neo021',
+                          mlines.Line2D([], [], color=sns.color_palette()[1])))
+            g.set(yticklabels=[])
+            g.set(xticklabels=[])
+            g.fig.legend(labels=[l[0] for l in lines],
+                         handles=[l[1] for l in lines],
+                         bbox_to_anchor=(0.995, 0.995), loc=1, prop={"size": 11})
+
+            # g.fig.tight_layout()
+            g.fig.subplots_adjust(wspace=0.15, hspace=0.25)
+
+    figPath = "/home/buck06191/Dropbox/phd/desat_neonate/ABC/Figures/"
+    g.savefig(figPath+'comparison_posteriors_neonate_desat_{}.png'.format(distance),
+              dpi=250, bbox_inches='tight', transparent=True)
 
 
-figPath = "/home/buck06191/Dropbox/phd/desat_neonate/ABC/Figures/"
-g.savefig(figPath+'comparison_posteriors_neonate_desat.png',
-          dpi=250, bbox_inches='tight', transparent=True)
+# %%

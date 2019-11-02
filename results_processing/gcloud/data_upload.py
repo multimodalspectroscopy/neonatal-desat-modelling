@@ -39,10 +39,10 @@ for neonate in NEONATES:
     # Set dataset_id to the ID of the dataset to create.
 
     dataset_id = 'neo_desat'
-    table_id = neonate
+    table_id = neonate+"_gradient"
 
-    filename = '/home/buck06191/Dropbox/phd/desat_neonate/ABC/pearsonr_SA/{}/all_parameters.csv'.format(
-        table_id)
+    filename = '/home/buck06191/Dropbox/phd/desat_neonate/ABC/gradient_SA/{}/all_parameters.csv'.format(
+        neonate)
 
     if not dataset_exists(client, dataset_id):
         # Construct a full Dataset object to send to the API.

@@ -47,13 +47,13 @@ def generate_histogram_query(project, neonate, n_bins, distance):
       COUNT(data.{distance}) AS num,
       INTEGER((data.{distance}-value.min)/(value.max-value.min)*{n_bins}) AS group_
     FROM
-      [{project}:neo_desat.{neonate}] data
+      [{project}:neo_desat.{neonate}_gradient] data
     CROSS JOIN (
       SELECT
         MAX({distance}) AS max,
         MIN({distance}) AS min
       FROM
-        [{project}:neo_desat.{neonate}]) value
+        [{project}:neo_desat.{neonate}_gradient]) value
     GROUP BY
       group_
     ORDER BY
@@ -73,7 +73,7 @@ SELECT
     {distance},
     idx
 FROM
-  `{project}.neo_desat.{neonate}`
+  `{project}.neo_desat.{neonate}_gradient`
 ORDER BY
   {distance} ASC
 LIMIT
@@ -395,84 +395,88 @@ labels = {"t": "Time (sec)",
           "Hbdiff": "$\Delta$HbD $(\mu M)$",
           "CCO": "$\Delta$CCO $(\mu M)$"
           }
-LIM = 10000
+LIM = 4000
 neonates = ["neo007", "neo021"]
 
 
 signals = ['CCO', 'HbT', 'Hbdiff']
 
+for SIGNAL in [''] + signals:
+    print("Working on {} ".format(SIGNAL if SIGNAL != '' else "TOTAL"))
+    for NEONATE in neonates:
 
-for NEONATE in neonates:
+        print("Working on {} ".format(NEONATE))
 
-    print("Working on {} ".format(NEONATE))
+        configuration[NEONATE] = {}
+        config, d0 = load_configuration(NEONATE)
+        configuration[NEONATE]['bayescmd_config'] = config
+        configuration[NEONATE]['original_data'] = d0
+        if SIGNAL != '':
+            distance = SIGNAL + "_NRMSE"
+        else:
+            distance = "NRMSE"
+        configuration[NEONATE]['histogram_query'] = generate_histogram_query('hypothermia-bayescmd',
+                                                                             NEONATE,
+                                                                             100,
+                                                                             distance)
 
-    configuration[NEONATE] = {}
-    config, d0 = load_configuration(NEONATE)
-    configuration[NEONATE]['bayescmd_config'] = config
-    configuration[NEONATE]['original_data'] = d0
+        configuration[NEONATE]['posterior_query'] = generate_posterior_query('hypothermia-bayescmd',
+                                                                             NEONATE,
+                                                                             distance,
+                                                                             list(
+                                                                                 configuration[NEONATE]['bayescmd_config']['parameters'].keys()),
+                                                                             limit=LIM)
+        # Set config and create figure path
 
-    configuration[NEONATE]['histogram_query'] = generate_histogram_query('hypothermia-bayescmd',
-                                                                         NEONATE,
-                                                                         100,
-                                                                         'NRMSE')
+        figPath = "/home/buck06191/Dropbox/phd/desat_neonate/ABC/Figures/{}_gradient/{}".format(
+            NEONATE, distance)
+        dir_util.mkpath(figPath)
 
-    configuration[NEONATE]['posterior_query'] = generate_posterior_query('hypothermia-bayescmd',
-                                                                         NEONATE,
-                                                                         'NRMSE',
-                                                                         list(
-                                                                             configuration[NEONATE]['bayescmd_config']['parameters'].keys()),
-                                                                         limit=LIM)
-    # Set config and create figure path
+        # Get posterior
+        print("\tRunning SQL query")
+        df_post = client.query(
+            configuration[NEONATE]['posterior_query']).to_dataframe()
 
-    figPath = "/home/buck06191/Dropbox/phd/desat_neonate/ABC/Figures/{}/{}".format(
-        NEONATE, 'NRMSE')
-    dir_util.mkpath(figPath)
+        # Plot posterior predictive
+        config["offset"] = {}
+        print("\tGetting Posterior Predictive")
 
-    # Get posterior
-    print("\tRunning SQL query")
-    df_post = client.query(
-        configuration[NEONATE]['posterior_query']).to_dataframe()
+        with Timer("Getting outputs"):
 
-    # Plot posterior predictive
-    config["offset"] = {}
-    print("\tGetting Posterior Predictive")
+            df_dict = {}
+            df_list, true_data = get_repeated_outputs(df_post, n_repeats=LIM/2, limit=LIM,
+                                                      distance=distance, neonate=NEONATE, **config)
+            df_dict[NEONATE] = df_list
 
-    with Timer("Getting outputs"):
+            ylabel_dict = labels
+            all_outputs = pd.concat(list(df_dict.values()))
+        with Timer("Plotting line plot"):
+            g = sns.FacetGrid(all_outputs, row='Output',
+                              hue='Neonate', height=2.5, aspect=2, sharey=False)
 
-        df_dict = {}
-        df_list, true_data = get_repeated_outputs(df_post, n_repeats=LIM, limit=LIM,
-                                                  distance='NRMSE', neonate=NEONATE, **config)
-        df_dict[NEONATE] = df_list
+            for ii, ax in enumerate(g.axes.flatten()):
+                ax.plot(true_data['t'], true_data[signals[ii]], 'k', '-')
 
-        ylabel_dict = labels
-        all_outputs = pd.concat(list(df_dict.values()))
-    with Timer("Plotting line plot"):
-        g = sns.FacetGrid(all_outputs, row='Output',
-                          hue='Neonate', height=2.5, aspect=2, sharey=False)
+            g = (g.map_dataframe(sns.lineplot, x='Time', y='Posterior',
+                                 estimator=np.median, ci=95)).add_legend()
+            plt.setp(g._legend.get_title(), fontsize=12)
+            plt.setp(g._legend.get_texts(), fontsize=11)
+            g = g.set_titles('')
+            g = g.set_xlabels('Time (sec)', fontsize=12)
 
-        for ii, ax in enumerate(g.axes.flatten()):
-            ax.plot(true_data['t'], true_data[signals[ii]], 'k', '-')
+            for ii, ax in enumerate(g.axes.flatten()):
+                ax.set_ylabel(ylabel_dict[signals[ii]], fontsize=12)
 
-        g = (g.map_dataframe(sns.lineplot, x='Time', y='Posterior',
-                             estimator=np.median, ci=95)).add_legend()
-        plt.setp(g._legend.get_title(), fontsize=12)
-        plt.setp(g._legend.get_texts(), fontsize=11)
-        g = g.set_titles('')
-        g = g.set_xlabels('Time (sec)', fontsize=12)
-
-        for ii, ax in enumerate(g.axes.flatten()):
-            ax.set_ylabel(ylabel_dict[signals[ii]], fontsize=12)
-
-            nticks = 5
-            ax.set_xticklabels(ax.get_xticklabels(), fontsize=11)
-            ax.autoscale()
-            y_min, y_max = ax.get_ylim()
-            ax.set_yticks(np.linspace(y_min, y_max, nticks))
-            ax.set_yticklabels(["{:.2g}".format(y)
-                                for y in np.linspace(y_min, y_max, nticks)], fontdict={'fontsize': 11})
-            ax.set_title(
-                string.ascii_lowercase[ii] + ")", fontsize=10, loc='left')
-    g.fig.align_ylabels()
-    g.fig.subplots_adjust(hspace=0.15)
-    g.savefig(figPath+'/{}_postpred.png'.format(NEONATE),
-              dpi=250, bbox_inches='tight', transparent=True)
+                nticks = 5
+                ax.set_xticklabels(ax.get_xticklabels(), fontsize=11)
+                ax.autoscale()
+                y_min, y_max = ax.get_ylim()
+                ax.set_yticks(np.linspace(y_min, y_max, nticks))
+                ax.set_yticklabels(["{:.2g}".format(y)
+                                    for y in np.linspace(y_min, y_max, nticks)], fontdict={'fontsize': 11})
+                ax.set_title(
+                    string.ascii_lowercase[ii] + ")", fontsize=10, loc='left')
+        g.fig.align_ylabels()
+        g.fig.subplots_adjust(hspace=0.15)
+        g.savefig(figPath+'/{}_postpred.png'.format(NEONATE),
+                  dpi=250, bbox_inches='tight', transparent=True)
