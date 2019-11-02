@@ -14,7 +14,7 @@ import scipy.stats as stats
 from bayescmd.abc import inputParse
 from bayescmd.abc import import_actual_data
 from bayescmd.abc import SummaryStats
-from bayescmd.results_handling import get_output
+from bayescmd.results_handling import get_output, frac_calculator
 from io import BytesIO
 from PIL import Image
 import matplotlib as mpl
@@ -29,7 +29,10 @@ import pandas as pd
 import numpy as np
 import warnings
 import time
+import sys
 warnings.filterwarnings('ignore')
+
+from subprocess import TimeoutExpired, CalledProcessError  # noqa
 
 
 # Google BigQuery
@@ -218,21 +221,34 @@ def get_runs(posterior, conf, n_repeats=50):
     posteriors = posterior[p_names].values
     d0 = import_actual_data(conf['input_path'])
     input_data = inputParse(d0, conf['inputs'])
-    while len(outputs_list) < n_repeats:
-        idx = rand_selection.pop()
-        print("\tSample {}, idx:{}".format(len(outputs_list), idx))
-        p = dict(zip(p_names, posteriors[idx]))
+    # while len(outputs_list) < n_repeats:
+    for i in range(1):  # range(n_repeats):
+        try:
+            idx = 1221  # rand_selection.pop()
+            print("\tSample {}, idx:{}".format(len(outputs_list), idx))
+            p = dict(zip(p_names, posteriors[idx]))
 
-        _, output = get_output(
-            conf['model_name'],
-            p,
-            conf['times'],
-            input_data,
-            d0,
-            conf['targets'],
-            distance="NRMSE",
-            zero_flag=conf['zero_flag'])
-        outputs_list.append(output)
+            _, output = get_output(
+                conf['model_name'],
+                p,
+                conf['times'],
+                input_data,
+                d0,
+                conf['targets'],
+                distance="NRMSE",
+                zero_flag=conf['zero_flag'])
+            outputs_list.append(output)
+        except (TimeoutError, TimeoutExpired) as e:
+            print("Timed out for Sample {}, idx:{}".format(
+                len(outputs_list), idx))
+            pprint(p)
+            # rand_selection.insert(0, idx)
+        except (CalledProcessError) as e:
+            print("CalledProcessError for Sample {}, idx:{}".format(
+                len(outputs_list), idx))
+            pprint(p)
+            # rand_selection.insert(0, idx)
+        print("Final number of runs is: {}".format(len(outputs_list)))
     return outputs_list
 
 
@@ -333,9 +349,9 @@ def get_repeated_outputs(df,
     posteriors = sorted_df.iloc[:accepted_limit][p_names].values
     select_idx = 0
     with Timer("Running repeat outputs"):
-        for i in range(n_repeats):
+        for i in range(1):  # range(n_repeats):
             try:
-                idx = rand_selection.pop()
+                idx = 1227  # rand_selection.pop()
                 p = dict(zip(p_names, posteriors[idx]))
                 if offset:
                     p = {**p, **offset}
@@ -355,12 +371,12 @@ def get_repeated_outputs(df,
                 print("Timed out for Sample {}, idx:{}".format(
                     len(outputs_list), idx))
                 pprint.pprint(p)
-                rand_selection.insert(0, idx)
+                # rand_selection.insert(0, idx)
             except (CalledProcessError) as e:
                 print("CalledProcessError for Sample {}, idx:{}".format(
                     len(outputs_list), idx))
                 pprint.pprint(p)
-                rand_selection.insert(0, idx)
+                # rand_selection.insert(0, idx)
 
         print("Final number of runs is: {}".format(len(outputs_list)))
 
