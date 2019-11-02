@@ -333,7 +333,7 @@ def get_repeated_outputs(df,
     posteriors = sorted_df.iloc[:accepted_limit][p_names].values
     select_idx = 0
     with Timer("Running repeat outputs"):
-        while len(outputs_list) < n_repeats:
+        for i in range(n_repeats):
             try:
                 idx = rand_selection.pop()
                 p = dict(zip(p_names, posteriors[idx]))
@@ -361,6 +361,8 @@ def get_repeated_outputs(df,
                     len(outputs_list), idx))
                 pprint.pprint(p)
                 rand_selection.insert(0, idx)
+
+        print("Final number of runs is: {}".format(len(outputs_list)))
 
     d = {"Errors": {}, "Outputs": {}}
     d['Errors']['Average'] = np.nanmean(
